@@ -241,7 +241,7 @@ def build_sns(**kwargs):
 def main():
     args = sns_arguments()
     sns = build_sns(**args).build()
-    sns.start_server()
+    sns.start_server_withRF()
 
 
 if __name__ == '__main__':

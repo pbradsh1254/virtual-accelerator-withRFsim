@@ -8,7 +8,8 @@ from typing import Dict, Any, List, TypeVar, Generic
 from virtaccl.server import Server, not_ctrlc
 from virtaccl.beam_line import BeamLine
 from virtaccl.model import Model
-
+from virtaccl.rf_sim_lib import CavityChain, SimulationParams
+from virtaccl.graphing import LiveDashboard, record_cav_pulse_step, record_beam_pulse_step, block_until_closed
 
 class VA_Parser:
     def __init__(self):
@@ -247,3 +248,38 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
                 time.sleep(sleep_time)
 
         print('Exiting. Thank you for using our virtual accelerator!')
+
+    def start_server_withRF(self):
+        self.server.start()
+        print(f"Server started.")
+        
+        simParams = SimulationParams(
+        dt=3e-6,
+        fill_duration=250e-6,
+        flattop_duration=300e-6,
+        beam_on_time=300e-6,
+        )
+        chain = CavityChain.from_json(simParams, "/home/hitesh/PyORBIT3/py/LLRF_Cavity/Python/cavityparameters2.json")
+        fill_data = chain.fill()
+        print(self.server.get_parameters())
+
+        now = None
+
+        while not_ctrlc():
+            loop_start_time = time.time()
+
+            if self.sync_time:
+                now = datetime.now()
+            self.track(timestamp=now)
+            self.server.update()
+
+            loop_time_taken = time.time() - loop_start_time
+            sleep_time = self.update_period - loop_time_taken
+            if sleep_time < 0.0:
+                print('Warning: Update took longer than refresh rate.')
+            else:
+                time.sleep(sleep_time)
+
+        print('Exiting. Thank you for using our virtual accelerator!')
+
+
