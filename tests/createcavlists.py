@@ -11,8 +11,8 @@ import numpy as np
 import json
 
 
-with open("parametersOUTPUT.json", "r") as prmfile:
-    parameterdict = json.load(prmfile) 
+with open("measurementsOUTPUT.json", "r") as msmfile:
+    measurementdict = json.load(msmfile) 
 with open("opticsOUTPUT.json", "r") as optcfile:
     opticsdict=json.load(optcfile)
 
@@ -62,16 +62,15 @@ for cavity in opticsdict:
 
 bpm_list = []
 phase_list = []
-for diag, param in parameterdict.items():
+for diag, meas in measurementdict.items():
     if 'SCL_Diag:BPM' in diag:
-        if 'phaseAvg' in diag:
-            if "23" in diag:
-                pass
-            elif "25" in diag:
-                pass
-            else:
-                bpm_list.append(diag)
-                phase_list.append(param)
+        if "23" in diag:
+            pass
+        elif "25" in diag:
+            pass
+        else:
+            bpm_list.append(diag)
+            phase_list.append(meas["phi_avg"])
 
 
 cavitysetupdict = {}
