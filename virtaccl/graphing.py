@@ -254,9 +254,8 @@ def record_beam_pulse_step(new_measurements, pulsetime, all_beams_history):
         if 'SCL' in device_name and 'BPM' in device_name:
             if device_name not in all_beams_history:
                 all_beams_history[device_name] = {'t': [], 'phase_avg': [], 'current': []}
-
             all_beams_history[device_name]['t'].append(pulsetime)
             all_beams_history[device_name]['phase_avg'].append(data['phi_avg'])
-            all_beams_history[device_name]['current'].append(data['current'])
+            all_beams_history[device_name]['current'].append(data['amp_avg'])
 
     return all_beams_history

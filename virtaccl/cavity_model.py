@@ -19,7 +19,6 @@ class AllCavitySpecs:
     """
     #--required--
     name: str
-    beta_geom: float
 
     R_over_Q: float
     amp: float
@@ -38,7 +37,7 @@ class AllCavitySpecs:
     #--controller params--
     enable_feedback: bool = False
     Kp: float = 20
-    Ki: float = 1e6                       # there may be more controller params that can be added here
+    Ki: float = 5e6                       # there may be more controller params that can be added here
     tau_leak: float = 1.5e-5               # slight leak, tau/dt timesteps original data will be divided by e
     
     #--rf source params--
@@ -81,7 +80,6 @@ class AllCavitySpecs:
         
         self._state_space_params = StateSpaceParams(
             name=self.name,
-            beta_geom=self.beta_geom,
             R_over_Q=self.R_over_Q,
             BPM_phase_offset=self.BPM_ref.get("phase_offset", 0.0),
             f0=self.f0,
@@ -150,7 +148,7 @@ class FeedforwardSchedule:
         # Fill phasor values during fill duration with calculated exponential rise
         phasor_values[time_points <= 0] = setpoint / max(1.0 - np.exp(-fill_duration / tau), 1e-12)
         # Maintain phasor values during flattop duration
-        phasor_values[(time_points > 0) & (time_points <= flattop_duration)] = 0.9 * setpoint
+        phasor_values[(time_points > 0) & (time_points <= flattop_duration)] = setpoint
         self.schedule = phasor_values
         self._current_index = 0
         self.is_active = True
@@ -392,7 +390,6 @@ class StateSpaceParams:
     L_active: float             # Active Length [m]
     Vmax: float                 # Maximum cavity field (V/m)
     BPM_phase_offset: float     # BPM phase reference for each cavity
-    beta_geom: float
     
     def __post_init__(self) -> None:
         self.omega0: float = TWO_PI*self.f0                       #natural angular resonant frequency
