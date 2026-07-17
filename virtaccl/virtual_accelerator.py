@@ -261,10 +261,10 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         print(f"Server started.")
         
         simParams = SimulationParams(
-        dt = 3e-6,
+        dt = 1e-6,
         fill_duration = 250e-6,
-        flattop_duration = 300e-6,
-        beam_on_time = 300e-6,
+        flattop_duration = 1000e-6,
+        beam_on_time = 380e-6,
         )
         chain = CavityChain.from_json(simParams, "/home/hitesh/virtual-accelerator-withRFsim/cavityparameters.json")
         fill_data = chain.fill()
@@ -340,26 +340,25 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
                 
                 for cav in cav_name:
                     if 'SCL:Cav' in cav:
-                        offset_dict = chain._bpm_offsets[cav]
-                        print(offset_dict)                
-                        for bpmPV in offset_dict:
-                            beam_cur = beam_cur | {cav: offset_dict[bpmPV]}
-                            cav_phi_deg = np.degrees(2* server_measurements[bpmPV] + offset_dict[bpmPV])- 20.5
+                        offset_dict = chain._bpm_offsets[cav]                
+                        for bpm in offset_dict:
+                            beam_cur = beam_cur | {cav: server_measurements[bpm]['amp_avg']}
+                            cav_phi_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm])- 20.5
                             cav_phi = (cav_phi_deg + np.pi) % (2 * np.pi) - np.pi
                             beam_phi = beam_phi | {cav: cav_phi} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
 
                 step_data = chain.flattop_step(beam_currents = beam_cur, beam_phases = beam_phi)
 
-            for cav, data in step_data.items():
-                server_optics[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
-                server_optics[cav]['phase'] = np.angle(data['cav_iq'])
+                for cav, data in step_data.items():
+                    server_optics[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
+                    server_optics[cav]['phase'] = np.angle(data['cav_iq'])
 
-            self.track(timestamp = now, server_optics = server_optics)
-            self.server.update()
+                self.track(timestamp = now, server_optics = server_optics)
+                self.server.update()
 
-            server_measurements = self.model.get_measurements()
-            all_BPM_hist = record_beam_pulse_step(server_measurements, chain._pulse_time, all_BPM_hist)
-            dashboard_beam.push(all_BPM_hist)
+                server_measurements = self.model.get_measurements()
+                all_BPM_hist = record_beam_pulse_step(server_measurements, chain._pulse_time, all_BPM_hist)
+                dashboard_beam.push(all_BPM_hist)
 
             all_cav_hist = record_cav_pulse_step(step_data, all_cav_hist)
             dashboard_cav.push(all_cav_hist)

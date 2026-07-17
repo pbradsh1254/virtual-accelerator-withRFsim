@@ -37,7 +37,7 @@ class AllCavitySpecs:
     #--controller params--
     enable_feedback: bool = False
     Kp: float = 20
-    Ki: float = 1e6                       # there may be more controller params that can be added here
+    Ki: float = 5e6                       # there may be more controller params that can be added here
     tau_leak: float = 1.5e-5               # slight leak, tau/dt timesteps original data will be divided by e
     
     #--rf source params--
@@ -148,7 +148,7 @@ class FeedforwardSchedule:
         # Fill phasor values during fill duration with calculated exponential rise
         phasor_values[time_points <= 0] = setpoint / max(1.0 - np.exp(-fill_duration / tau), 1e-12)
         # Maintain phasor values during flattop duration
-        phasor_values[(time_points > 0) & (time_points <= flattop_duration)] = 0.9 * setpoint
+        phasor_values[(time_points > 0) & (time_points <= flattop_duration)] = setpoint
         self.schedule = phasor_values
         self._current_index = 0
         self.is_active = True
@@ -581,7 +581,7 @@ class StateSpaceCavityModel:
             I_beam = 0.0 + 0.0j
             V_beam = 0.0 + 0.0j
             if beam_current is not None:
-                I_beam = beam_current * np.exp(1j*beam_phase) / 1000
+                I_beam = beam_current * np.exp(1j*beam_phase)
                 V_beam = -self.all_specs.alpha_beam * self.all_specs._state_space_params.R_L * I_beam
 
             static_Hz, lfd_Hz, mic_Hz, rand_Hz = self._detuning_components(dt)
@@ -623,7 +623,7 @@ class StateSpaceCavityModel:
         P_fwd  = np.abs(((V_fwd) ** 2) / (4.0 * R_L))
         P_refl = np.abs(((V_refl) ** 2) / (4.0 * R_L))
         # beam power: (1/2) Re(V_c I_b*) — uses I_b directly (externally-set phasor)
-        S_beam = 0.5 * V_cav * I_beam / 1000
+        S_beam = 0.5 * V_cav * I_beam
         P_beam = np.real(S_beam)
 
         return StepOutput(
