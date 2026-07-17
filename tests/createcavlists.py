@@ -95,7 +95,5 @@ filename = 'cavityparameters.json'
 with open(filename, 'w') as json_file:
     json.dump(cavitysetupdict, json_file)
 
-print(f"Successfully created {filename}")
-
 
 
