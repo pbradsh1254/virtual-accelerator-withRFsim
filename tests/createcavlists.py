@@ -74,7 +74,7 @@ for diag, meas in measurementdict.items():
 
 
 cavitysetupdict = {}
-indexx = 1 # start at bpm00b not a
+indexx = 0 # start at bpm00b
 for cryo in SCL_DICTIONARY:
     for cavity in SCL_DICTIONARY[cryo]:
         difference = scl_cav_params[cavity]['phase'] - 2* phase_list[indexx] + np.pi*1.5
