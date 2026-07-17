@@ -10,6 +10,7 @@ from virtaccl.beam_line import BeamLine
 from virtaccl.model import Model
 from virtaccl.rf_sim_lib import CavityChain, SimulationParams
 from virtaccl.graphing import LiveDashboard, record_cav_pulse_step, record_beam_pulse_step, block_until_closed
+import json
 
 class VA_Parser:
     def __init__(self):
@@ -262,6 +263,8 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         chain = CavityChain.from_json(simParams, "/home/hitesh/PyORBIT3/py/LLRF_Cavity/Python/cavityparameters2.json")
         fill_data = chain.fill()
         print(self.server.get_parameters())
+        with open("parametersOUTPUT.json", "w") as jsonfile:
+            json.dump(self.server.get_parameters(), jsonfile)
 
         now = None
 
