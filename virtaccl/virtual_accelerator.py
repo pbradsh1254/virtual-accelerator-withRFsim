@@ -214,11 +214,17 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
             return_dict = self.server.get_parameters()
         return return_dict
 
-    def track(self, timestamp: datetime = None, server_params = None):
-        self.beam_line.update_settings_from_server(server_params)
-        new_optics = self.beam_line.get_model_optics()
+    def track(self, timestamp: datetime = None, server_optics = None):
 
-        self.model.update_optics(new_optics)
+        server_params = self.server.get_parameters()
+        self.beam_line.update_settings_from_server(server_params)
+
+        if server_optics is not None:
+            self.model.update_optics(server_optics)
+        else:
+            server_optics = self.beam_line.get_model_optics()
+            self.model.update_optics(server_optics)        
+
         self.beam_line.update_readbacks()
         self.model.track()
 
@@ -260,11 +266,12 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         flattop_duration = 300e-6,
         beam_on_time = 300e-6,
         )
-        chain = CavityChain.from_json(simParams, "/home/hitesh/PyORBIT3/py/LLRF_Cavity/Python/cavityparameters2.json")
+        chain = CavityChain.from_json(simParams, "/home/hitesh/virtual-accelerator-withRFsim/cavityparameters.json")
         fill_data = chain.fill()
 
-        server_params = self.server.get_parameters()
-        self.track(timestamp = None, server_params = server_params)
+        now = None
+        server_optics = self.beam_line.get_model_optics()
+        self.track(timestamp = now, server_optics = server_optics)
         self.server.update()
 
         all_cav_hist = {}
@@ -284,7 +291,9 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
 
         cav_name = list(fill_data.keys())
 
-       # BPM_name = [name for name in server_measurements.keys() if ] We need to change the way of reading the file
+        server_measurements = self.model.get_measurements()
+
+        BPM_name = [name for name in server_measurements.keys() if 'SCL_Diag:BPM' in name]
 
         dashboard_cav = LiveDashboard(
             cav_name,
@@ -312,40 +321,52 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         beam_start = simParams.beam_on_time
         chain.switch_feedback(True)
 
-        while chain._pulse_time< (simParams.fill_duration + simParams.flattop_duration) or not_ctrlc():
+        while chain._pulse_time < (simParams.fill_duration + simParams.flattop_duration) and not_ctrlc():
             loop_start_time = time.time()
+            # print(chain._pulse_time)
+            # print()
+            # print(simParams.fill_duration + simParams.flattop_duration)
+            # print()
+            if self.sync_time:
+                now = datetime.now()
 
             if chain._pulse_time < beam_start:
                 step_data = chain.flattop_step()   
             else:
                 server_measurements = self.model.get_measurements()
-                server_params = self.server.get_parameters()
+                server_optics = self.beam_line.get_model_optics()
                 beam_cur = {}
                 beam_phi = {}
+                
                 for cav in cav_name:
-                    offset_dict = chain._bpm_offsets[cav]
-                    beam_cur = beam_cur | {cav: server_measurements[bpm]['current']}
-                    cav_phi_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm])- 20.5
-                    cav_phi = (cav_phi_deg + np.pi) % (2 * np.pi) - np.pi
-                    bp = bp | {cavity: cav_phi} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
+                    if 'SCL:Cav' in cav:
+                        offset_dict = chain._bpm_offsets[cav]
+                        print(offset_dict)                
+                        for bpmPV in offset_dict:
+                            beam_cur = beam_cur | {cav: offset_dict[bpmPV]}
+                            cav_phi_deg = np.degrees(2* server_measurements[bpmPV] + offset_dict[bpmPV])- 20.5
+                            cav_phi = (cav_phi_deg + np.pi) % (2 * np.pi) - np.pi
+                            beam_phi = beam_phi | {cav: cav_phi} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
 
-            step_data = chain.flattop_step(beam_currents = beam_cur, beam_phases = beam_phi)
+                step_data = chain.flattop_step(beam_currents = beam_cur, beam_phases = beam_phi)
+
             for cav, data in step_data.items():
-                server_params[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
-                server_params[cav]['phase'] = np.angle(data['cav_iq'])
+                server_optics[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
+                server_optics[cav]['phase'] = np.angle(data['cav_iq'])
 
-            self.track(timestamp = trn_count * simParams.dt, server_params = server_params)
+            self.track(timestamp = now, server_optics = server_optics)
             self.server.update()
 
             server_measurements = self.model.get_measurements()
             all_BPM_hist = record_beam_pulse_step(server_measurements, chain._pulse_time, all_BPM_hist)
+            dashboard_beam.push(all_BPM_hist)
 
-        all_cav_hist = record_cav_pulse_step(step_data, all_cav_hist)
-        dashboard_cav.push(all_cav_hist)
+            all_cav_hist = record_cav_pulse_step(step_data, all_cav_hist)
+            dashboard_cav.push(all_cav_hist)
 
-        trn_count += 1
-        if (trn_count) % 10 == 0:
-            print(str(trn_count) + ' timesteps completed')
+            trn_count += 1
+            if (trn_count) % 10 == 0:
+                print(str(trn_count) + ' timesteps completed')
 # =============================================================================
 #       loop_time_taken = time.time() - loop_start_time
 #       sleep_time = self.update_period - loop_time_taken
@@ -355,18 +376,17 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
 #           time.sleep(sleep_time)
 # =============================================================================      
 
-        chain.switch_feedback(False)
-        server_params = server.get_settings()  
+        chain.switch_feedback(False)  
         decay_data  = chain.decay(n_tau=5)
         #add data to graphing list
         #graphing functions based on cavity  
-        for cavity, data in decay_data.items():
+        for cav, data in decay_data.items():
             cav_iq_arr = np.atleast_1d(data['cav_iq'])     
             fwd_iq_arr = np.atleast_1d(data['fwd_iq'])     
             refl_iq_arr = np.atleast_1d(data['refl_iq'])    
             t_arr = np.atleast_1d(data['t'])
 
-            hist = all_cavities_history[cavity]
+            hist = all_cav_hist[cav]
             hist['t'].extend(t_arr)
             hist['amp'].extend(np.abs(cav_iq_arr))
             hist['phase'].extend(np.angle(cav_iq_arr))

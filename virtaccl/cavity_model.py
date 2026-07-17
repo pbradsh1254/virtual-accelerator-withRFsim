@@ -19,7 +19,6 @@ class AllCavitySpecs:
     """
     #--required--
     name: str
-    beta_geom: float
 
     R_over_Q: float
     amp: float
@@ -81,7 +80,6 @@ class AllCavitySpecs:
         
         self._state_space_params = StateSpaceParams(
             name=self.name,
-            beta_geom=self.beta_geom,
             R_over_Q=self.R_over_Q,
             BPM_phase_offset=self.BPM_ref.get("phase_offset", 0.0),
             f0=self.f0,
@@ -392,7 +390,6 @@ class StateSpaceParams:
     L_active: float             # Active Length [m]
     Vmax: float                 # Maximum cavity field (V/m)
     BPM_phase_offset: float     # BPM phase reference for each cavity
-    beta_geom: float
     
     def __post_init__(self) -> None:
         self.omega0: float = TWO_PI*self.f0                       #natural angular resonant frequency
@@ -584,7 +581,7 @@ class StateSpaceCavityModel:
             I_beam = 0.0 + 0.0j
             V_beam = 0.0 + 0.0j
             if beam_current is not None:
-                I_beam = beam_current * np.exp(1j*beam_phase)
+                I_beam = beam_current * np.exp(1j*beam_phase) / 1000
                 V_beam = -self.all_specs.alpha_beam * self.all_specs._state_space_params.R_L * I_beam
 
             static_Hz, lfd_Hz, mic_Hz, rand_Hz = self._detuning_components(dt)
@@ -626,7 +623,7 @@ class StateSpaceCavityModel:
         P_fwd  = np.abs(((V_fwd) ** 2) / (4.0 * R_L))
         P_refl = np.abs(((V_refl) ** 2) / (4.0 * R_L))
         # beam power: (1/2) Re(V_c I_b*) — uses I_b directly (externally-set phasor)
-        S_beam = 0.5 * V_cav * I_beam
+        S_beam = 0.5 * V_cav * I_beam / 1000
         P_beam = np.real(S_beam)
 
         return StepOutput(
