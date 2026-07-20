@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 from datetime import datetime
 from importlib.metadata import version
+from pathlib import Path
 from typing import Dict, Any, List, TypeVar, Generic
 
 from virtaccl.server import Server, not_ctrlc
@@ -266,7 +267,10 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         flattop_duration = 1000e-6,
         beam_on_time = 380e-6,
         )
-        chain = CavityChain.from_json(simParams, "/home/hitesh/virtual-accelerator-withRFsim/cavityparameters.json")
+        config_path = Path(__file__).resolve().parent.parent / "cavityparameters.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"Cavity parameters file not found: {config_path}")
+        chain = CavityChain.from_json(simParams, str(config_path))
         fill_data = chain.fill()
 
         now = None
