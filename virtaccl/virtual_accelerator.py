@@ -363,7 +363,6 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
                 self.track(timestamp = now, server_optics = server_optics)
                 self.server.update()
 
-                server_measurements = self.model.get_measurements()
                 all_BPM_hist = record_beam_pulse_step(server_measurements, chain._pulse_time, all_BPM_hist)
                 dashboard_beam.push(all_BPM_hist)
 
