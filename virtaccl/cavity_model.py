@@ -32,7 +32,7 @@ class AllCavitySpecs:
     Q_L: float = 7.5e5          # Loaded quality factor
     L_active: float = 0.906     # Active Length [m]
     Vmax: float = 2e7           # Maximum cavity field (V/m)
-    alpha_beam: float = 0.75     # ideal beam loading
+    alpha_beam: float = 645/945     # beam loading including chopper time removal
     
     #--controller params--
     enable_feedback: bool = False

@@ -267,7 +267,7 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         simParams = SimulationParams(
         dt = 1e-6,
         fill_duration = 250e-6,
-        flattop_duration = 1000e-6,
+        flattop_duration = 1380e-6,
         beam_on_time = 380e-6,
         )
         config_path = Path(__file__).resolve().parent.parent / "cavityparameters.json"
@@ -342,19 +342,19 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
             else:
                 server_measurements = self.model.get_measurements()
                 server_optics = self.beam_line.get_model_optics()
-                beam_cur = {}
-                beam_phi = {}
+                beam_cur_dict = {}
+                beam_phi_dict = {}
                 
                 for cav in cav_name:
                     if 'SCL:Cav' in cav:
                         offset_dict = chain._bpm_offsets[cav]                
                         for bpm in offset_dict:
-                            beam_cur = beam_cur | {cav: server_measurements[bpm]['amp_avg']}
-                            cav_phi_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm]) + 
-                            cav_phi = (np.radians(cav_phi_deg) + ONEPI) % (TWOPI) - ONEPI
-                            beam_phi = beam_phi | {cav: cav_phi} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
+                            beam_cur_dict = beam_cur_dict | {cav: server_measurements[bpm]['amp_avg']}
+                            beam_phase_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm]) + 67.5
+                            beam_phase = (np.radians(beam_phase_deg) + ONEPI) % (TWOPI) - ONEPI
+                            beam_phi_dict = beam_phi_dict | {cav: beam_phase} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
 
-                step_data = chain.flattop_step(beam_currents = beam_cur, beam_phases = beam_phi)
+                step_data = chain.flattop_step(beam_currents = beam_cur_dict, beam_phases = beam_phi_dict)
 
                 for cav, data in step_data.items():
                     server_optics[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
