@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 from datetime import datetime
 from importlib.metadata import version
+from pathlib import Path
 from typing import Dict, Any, List, TypeVar, Generic
 
 from virtaccl.server import Server, not_ctrlc
@@ -12,6 +13,9 @@ from virtaccl.model import Model
 from virtaccl.rf_sim_lib import CavityChain, SimulationParams
 from virtaccl.graphing import LiveDashboard, record_cav_pulse_step, record_beam_pulse_step, block_until_closed
 import json
+
+ONEPI = np.pi
+TWOPI = 2 * np.pi
 
 class VA_Parser:
     def __init__(self):
@@ -263,10 +267,13 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         simParams = SimulationParams(
         dt = 1e-6,
         fill_duration = 250e-6,
-        flattop_duration = 1000e-6,
+        flattop_duration = 1380e-6,
         beam_on_time = 380e-6,
         )
-        chain = CavityChain.from_json(simParams, "/home/hitesh/virtual-accelerator-withRFsim/cavityparameters.json")
+        config_path = Path(__file__).resolve().parent.parent / "cavityparameters.json"
+        if not config_path.exists():
+            raise FileNotFoundError(f"Cavity parameters file not found: {config_path}")
+        chain = CavityChain.from_json(simParams, str(config_path))
         fill_data = chain.fill()
 
         now = None
@@ -335,19 +342,19 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
             else:
                 server_measurements = self.model.get_measurements()
                 server_optics = self.beam_line.get_model_optics()
-                beam_cur = {}
-                beam_phi = {}
+                beam_cur_dict = {}
+                beam_phi_dict = {}
                 
                 for cav in cav_name:
                     if 'SCL:Cav' in cav:
                         offset_dict = chain._bpm_offsets[cav]                
                         for bpm in offset_dict:
-                            beam_cur = beam_cur | {cav: server_measurements[bpm]['amp_avg']}
-                            cav_phi_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm])- 20.5
-                            cav_phi = (cav_phi_deg + np.pi) % (2 * np.pi) - np.pi
-                            beam_phi = beam_phi | {cav: cav_phi} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
+                            beam_cur_dict = beam_cur_dict | {cav: server_measurements[bpm]['amp_avg']}
+                            beam_phase_deg = np.degrees(2* server_measurements[bpm]['phi_avg'] + offset_dict[bpm]) + 67.5
+                            beam_phase = (np.radians(beam_phase_deg) + ONEPI) % (TWOPI) - ONEPI
+                            beam_phi_dict = beam_phi_dict | {cav: beam_phase} #must change from 402.5 to 805 MHz, offset is structured this way as well in createcavlists.
 
-                step_data = chain.flattop_step(beam_currents = beam_cur, beam_phases = beam_phi)
+                step_data = chain.flattop_step(beam_currents = beam_cur_dict, beam_phases = beam_phi_dict)
 
                 for cav, data in step_data.items():
                     server_optics[cav]['amp'] = np.abs(data['cav_iq']) / 15e6 #This needs to be fixed to actually represent a real normal value
@@ -366,14 +373,14 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
             trn_count += 1
             if (trn_count) % 10 == 0:
                 print(str(trn_count) + ' timesteps completed')
-# =============================================================================
-#       loop_time_taken = time.time() - loop_start_time
-#       sleep_time = self.update_period - loop_time_taken
-#       if sleep_time < 0.0:
-#           print('Warning: Update took longer than refresh rate.')
-#       else:
-#           time.sleep(sleep_time)
-# =============================================================================      
+        # =============================================================================
+        #       loop_time_taken = time.time() - loop_start_time
+        #       sleep_time = self.update_period - loop_time_taken
+        #       if sleep_time < 0.0:
+        #           print('Warning: Update took longer than refresh rate.')
+        #       else:
+        #           time.sleep(sleep_time)
+        # =============================================================================      
 
         chain.switch_feedback(False)  
         decay_data  = chain.decay(n_tau=5)
@@ -402,5 +409,4 @@ class VirtualAccelerator(Generic[ModelType, ServerType]):
         block_until_closed()
 
         print('Exiting. Thank you for using our virtual accelerator!')
-
 
